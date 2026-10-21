@@ -13,7 +13,7 @@ export default function HeroScene() {
   }
 
   return (
-    <div
+    <figure
       className="scene"
       onPointerMove={move}
       onPointerLeave={() => setTilt({ x: 0, y: 0 })}
@@ -22,18 +22,16 @@ export default function HeroScene() {
       style={{ "--tilt-x": `${tilt.x}deg`, "--tilt-y": `${tilt.y}deg` } as React.CSSProperties}
     >
       <div className="scene-grid" />
-      <div className="scene-halo" />
       <div className="scene-orbit orbit-one"><span className="signal signal-a" /></div>
       <div className="scene-orbit orbit-two"><span className="signal signal-b" /></div>
       <div className="scene-core">
-        <div className="core-shine" />
         <div className="core-ring ring-one" />
         <div className="core-ring ring-two" />
         <span className="core-dot" />
       </div>
-      <div className="scene-card card-top"><span className="pulse-dot" /> Signal field <strong>illustration</strong></div>
+      <div className="scene-card card-top"><span className="fig-dot" /> Signal field <strong>illustration</strong></div>
       <div className="scene-card card-bottom"><small>DECORATIVE ARTWORK</small><strong>No real data shown</strong></div>
-      <div className="scene-caption">AURA / SIGNAL FIELD · ILLUSTRATIVE ONLY</div>
-    </div>
+      <figcaption className="scene-caption">Fig. 1 · Signal field · Illustrative only</figcaption>
+    </figure>
   );
 }

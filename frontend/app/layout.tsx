@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk, Instrument_Serif } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import { Averia_Serif_Libre } from "next/font/google";
 import "./globals.css";
 
-const body = Inter({ subsets: ["latin"], variable: "--font-body", display: "swap" });
-const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-display", display: "swap" });
-const serif = Instrument_Serif({
+const accentSerif = Averia_Serif_Libre({
   subsets: ["latin"],
-  weight: "400",
-  style: ["normal", "italic"],
-  variable: "--font-serif",
+  weight: ["300", "400", "700"],
+  style: ["italic"],
+  variable: "--font-averia",
   display: "swap"
 });
 
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${body.variable} ${display.variable} ${serif.variable}`}>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${accentSerif.variable}`}>
       <body>{children}</body>
     </html>
   );

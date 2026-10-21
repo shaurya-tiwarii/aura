@@ -32,9 +32,9 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: PUBLIC_BASE_URL
-        value: https://aura-api.onrender.com
+        value: https://aura-api-fm40.onrender.com
       - key: BACKEND_CORS_ORIGINS
-        value: https://aura-frontend.onrender.com
+        value: https://aura-frontend-q7o9.onrender.com
 
   - type: web
     name: aura-frontend
@@ -45,10 +45,12 @@ services:
     startCommand: node .next/standalone/server.js
     healthCheckPath: /
     envVars:
+      - key: HOSTNAME
+        value: 0.0.0.0
       - key: NODE_VERSION
         value: 20.18.0
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
       # Baked into the bundle at build time; must be set before build.
       - key: NEXT_PUBLIC_API_URL
-        value: https://aura-api.onrender.com
+        value: https://aura-api-fm40.onrender.com
