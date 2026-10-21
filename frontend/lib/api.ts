@@ -53,7 +53,7 @@ async function refreshTokens(): Promise<boolean> {
       const refreshToken = localStorage.getItem(REFRESH_KEY);
       if (!refreshToken) return false;
       // Direct fetch, never api(): a failing refresh must not recurse into
-      // another 401 → redirect loop.
+      // another 401: redirect loop.
       const res = await fetch(`${API_URL}/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -46,10 +46,12 @@ export default function LoginPage() {
     <p className="eyebrow">YOUR SEARCH VISIBILITY WORKSPACE</p>
     <h1>{register ? "Create your workspace" : "Welcome back"}</h1>
     <p className="muted">{register ? "Start with a business and a website. You can add the rest as you go." : "Sign in to analyze, optimize, publish, and grow."}</p>
-    {!register && <button type="button" className="button google-button" onClick={signInWithGoogle} disabled={busy}>
-      <span aria-hidden="true">G</span> Continue with Google
-    </button>}
-    {!register && <div className="auth-divider"><span>or continue with email</span></div>}
+    {supabaseConfigured && !register && <>
+      <button type="button" className="button google-button" onClick={signInWithGoogle} disabled={busy}>
+        <span aria-hidden="true">G</span> Continue with Google
+      </button>
+      <div className="auth-divider"><span>or continue with email</span></div>
+    </>}
     <form onSubmit={submit}>
       {register && <label>Full name<input value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></label>}
       <label>Email<input required type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></label>
@@ -59,6 +61,5 @@ export default function LoginPage() {
     </form>
     <button className="link-button" onClick={() => { setRegister(!register); setError(""); }}>{register ? "Already have an account? Sign in" : "New to AURA? Create an account"}</button>
     <p className="fine-print">Your scores are explainable estimates, not guarantees of ranking or AI citation.</p>
-    {!supabaseConfigured && <p className="config-note">Google login becomes available when Supabase is configured.</p>}
   </div></main>;
 }
