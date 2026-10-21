@@ -1,0 +1,95 @@
+[project]
+name = "aura-backend"
+version = "0.1.0"
+description = "AURA -- AI-powered search visibility, content intelligence, and marketing automation for small businesses."
+requires-python = ">=3.13"
+
+# Dependencies are pinned in requirements.txt rather than here. This file exists
+# for tool configuration; the project is not installed as a package (imports
+# resolve from backend/ as the working directory, which is what run.py sets up).
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+# Previously ruff ran on defaults from two places -- the Alembic post-write hook
+# and the editor's format-on-save -- which meant "which rules apply" was implicit
+# and the two could drift. Declaring it here makes the lint result reproducible
+# and identical in both.
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+extend-exclude = [".venv", "aura.db"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes -- unused imports, undefined names
+    "I",      # isort -- import ordering
+    "B",      # flake8-bugbear -- likely bugs
+    "BLE",    # flake8-blind-except -- bare `except Exception`
+    "C4",     # flake8-comprehensions
+    "C90",    # mccabe complexity
+    "UP",     # pyupgrade -- modern syntax for the target version
+    "SIM",    # flake8-simplify
+    "RUF",    # ruff-specific rules
+    "S",      # flake8-bandit -- security
+    "DTZ",    # flake8-datetimez -- naive datetime calls
+    "T20",    # flake8-print -- no stray print() in app code
+    "RET",    # flake8-return
+    "PTH",    # prefer pathlib
+]
+ignore = [
+    # The codebase documents intent in prose docstrings; ruff's line-length rule
+    # already covers code, and E501 on comments fights the explanatory style.
+    "E501",
+    # Assigning then returning is often clearer with a named intermediate.
+    "RET504",
+    # S105/S106 match on *variable names* containing "password"/"token". Every hit
+    # in this codebase is a name coincidence on correct code: the ActivityType
+    # members PASSWORD_RESET_REQUESTED and PASSWORD_CHANGED, the dummy Argon2 hash
+    # used to equalise login timing, and the INSECURE_SECRET_KEY sentinel whose
+    # entire purpose is to be recognised and rejected in production. No password or
+    # token literal is stored in source, and config.py enforces that at startup --
+    # a check with teeth, unlike a name-pattern lint.
+    "S105",
+    "S106",
+]
+
+# ARG (unused-argument) is deliberately NOT selected. In this codebase it fires
+# almost exclusively on signatures the code does not control: the 12 abstract
+# methods of AuthBackend (whose parameters are unused *by definition*), the two
+# concrete backends implementing them, SQLAlchemy's
+# TypeDecorator.process_bind_param(self, value, dialect), FastAPI's lifespan(app),
+# and Alembic's include_object(obj, ..., compare_to) callbacks. Renaming those
+# parameters to _-prefixed names to satisfy a linter would break the interface
+# contract. Genuinely dead local code is still caught by F401/F841.
+
+[tool.ruff.lint.mccabe]
+# Auth and URL parsing have genuinely branchy validation paths. Anything past
+# this should be split; the verification scripts are linear check-after-check by
+# design and carry an explicit per-function noqa instead.
+max-complexity = 12
+
+[tool.ruff.lint.per-file-ignores]
+# Verification scripts are meant to print, and their asserts are the point --
+# S101 (assert) and T201 (print) would flag every line that does the work.
+"scripts/*" = ["S101", "T201"]
+# Tests intentionally use assertions and may construct date values for payloads.
+"tests/*" = ["S101", "DTZ011"]
+# Migrations are generated then hand-edited; they are linear DDL by nature.
+# env.py prints because it runs as a CLI tool, before app logging exists.
+"alembic/env.py" = ["T201"]
+"alembic/versions/*" = ["E402", "C901"]
+# run.py's whole job is to fix sys.path before importing the app, so its imports
+# cannot come first.
+"run.py" = ["E402", "T201"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+# Keep async fixture semantics explicit so pytest-asyncio upgrades cannot change
+# the scope of a database or ASGI fixture underneath the integration suite.
+asyncio_default_fixture_loop_scope = "function"

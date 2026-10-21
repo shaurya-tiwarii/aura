@@ -1,0 +1,54 @@
+# Render Blueprint for AURA.
+# Apply via the Render dashboard: New -> Blueprint -> connect the repo.
+# Free-plan services spin down when idle (cold starts); Postgres free tier
+# is for demo/portfolio use. AUTH_PROVIDER=local: email/password auth with
+# no external dependency. Gemini is optional — add GEMINI_API_KEY in the
+# dashboard later to enable generation features.
+
+databases:
+  - name: aura-db
+    plan: free
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: aura-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    plan: free
+    healthCheckPath: /health/ready
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_FORMAT
+        value: json
+      - key: AUTH_PROVIDER
+        value: local
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aura-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PUBLIC_BASE_URL
+        value: https://aura-api.onrender.com
+      - key: BACKEND_CORS_ORIGINS
+        value: https://aura-frontend.onrender.com
+
+  - type: web
+    name: aura-frontend
+    runtime: node
+    rootDir: frontend
+    plan: free
+    buildCommand: npm ci --ignore-scripts && npm run build && cp -r .next/static .next/standalone/.next/static
+    startCommand: node .next/standalone/server.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # Baked into the bundle at build time; must be set before build.
+      - key: NEXT_PUBLIC_API_URL
+        value: https://aura-api.onrender.com

@@ -1,0 +1,37 @@
+# Secrets — never commit
+.env
+.env.local
+*.env
+backend/.env
+frontend/.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.testvenv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Databases (local dev artifacts)
+*.db
+*.sqlite
+*.sqlite3
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
