@@ -14,6 +14,7 @@ model generated real text.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
@@ -66,6 +67,33 @@ class AssistantOutput(BaseModel):
     answer: str = Field(min_length=1, max_length=6000)
     suggested_actions: list[dict[str, str]] = Field(default_factory=list)
     demo: bool = False
+
+
+def plain_text(value: str) -> str:
+    """Reduce model prose to plain text for the assistant surfaces.
+
+    The chat UI renders message text literally, so markdown markers would
+    show up as raw asterisks. Assistant and explanation answers are therefore
+    stored and displayed without markdown: emphasis markers, heading hashes,
+    blockquote markers, and code backticks are removed, and em/en dashes are
+    replaced (a comma for the spaced form, a hyphen otherwise) because the
+    product copy standard bans dash separators. Content generation is NOT
+    passed through here: generated articles legitimately use markdown
+    headings, and the content scorer counts them.
+    """
+    text = value or ""
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text, flags=re.S)
+    text = re.sub(r"__(.+?)__", r"\1", text, flags=re.S)
+    text = re.sub(r"\*(.+?)\*", r"\1", text, flags=re.S)
+    text = re.sub(r"^\s*\*\s+", "- ", text, flags=re.M)
+    text = text.replace("*", "")
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.M)
+    text = re.sub(r"^>\s?", "", text, flags=re.M)
+    text = text.replace("`", "")
+    text = re.sub(r"^\s*[-_]{3,}\s*$", "", text, flags=re.M)
+    text = text.replace(" \u2014 ", ", ").replace(" \u2013 ", ", ")
+    text = text.replace("\u2014", "-").replace("\u2013", "-")
+    return text.strip()
 
 
 class GeminiServiceError(RuntimeError):
@@ -144,7 +172,13 @@ class GeminiService:
             return self._demo_explanation(subject, context)
 
         prompt = self._build_explanation_prompt(subject, context, tone)
-        return self._generate_structured_json(prompt, ExplanationOutput)
+        typed = self._generate_structured_json(prompt, ExplanationOutput)
+        return ExplanationOutput(
+            summary=plain_text(typed.summary),
+            explanation=plain_text(typed.explanation),
+            key_points=[plain_text(point) for point in typed.key_points],
+            demo=typed.demo,
+        )
 
     def rewrite(self, title: str, body: str, tone: str = "clear") -> RewriteOutput:
         """Return a structured rewrite for an existing content draft.
@@ -176,11 +210,27 @@ class GeminiService:
             "The demo field must be boolean false. Answer only from the supplied "
             "business evidence; say when evidence is missing. Never claim to have "
             "taken an action. suggested_actions must be short objects with only "
-            "title and description strings.\n"
+            "title and description strings. Write the answer in plain text only: "
+            "no markdown, no asterisks, no bold or italic markers, no headings, "
+            "and no em dashes or en dashes. Use short lines; if you list points, "
+            "put each point on its own line starting with its number. Justify "
+            "every point with the evidence behind it (the score, count, or fact "
+            "from the supplied evidence) instead of giving bare advice.\n"
             f"Question: {question}\nConversation history: {history}\n"
             f"Business evidence: {context}"
         )
-        return self._generate_structured_json(prompt, AssistantOutput)
+        typed = self._generate_structured_json(prompt, AssistantOutput)
+        return AssistantOutput(
+            answer=plain_text(typed.answer),
+            suggested_actions=[
+                {
+                    "title": plain_text(str(action.get("title", ""))),
+                    "description": plain_text(str(action.get("description", ""))),
+                }
+                for action in typed.suggested_actions
+            ],
+            demo=typed.demo,
+        )
 
     def _generate_structured_json(
         self,
