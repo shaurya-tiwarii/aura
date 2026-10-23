@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from typing import Any
 
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
@@ -106,6 +107,47 @@ class GeminiUnavailableError(GeminiServiceError):
 
 class GeminiGenerationError(GeminiServiceError):
     """Raised when the model call fails, returns invalid JSON, or emits the wrong schema."""
+
+
+# Transient failure handling for the Gemini call path.
+#
+# Google returns 503 capacity errors on flash models at peak times (observed
+# on 2026-10-22: gemini-3.7/3.8-flash both returned 503 while gemini-3.6-flash
+# stayed healthy). A generation that fails only because of a capacity spike
+# should retry with backoff instead of surfacing "The AI model could not
+# complete that request" to the user.
+_MAX_MODEL_ATTEMPTS = 3
+_RETRY_BASE_SECONDS = 2.0
+
+
+def _is_retryable_model_error(exc: BaseException) -> bool:
+    """Decide whether a raw model-call failure is worth retrying.
+
+    Retries are limited to transport problems, rate limits, and server-side
+    capacity errors (503/overloaded/unavailable/timeouts). Anything else
+    (bad request, auth failure, blocked content) fails immediately so a
+    real configuration problem is never hidden behind retries.
+    """
+    if isinstance(exc, (TimeoutError, ConnectionError)):
+        return True
+    code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+    if code in (429, 500, 502, 503, 504):
+        return True
+    text = f"{type(exc).__name__}: {exc}".lower()
+    return any(
+        marker in text
+        for marker in (
+            "503",
+            "overloaded",
+            "unavailable",
+            "serviceunavailable",
+            "temporarily",
+            "timed out",
+            "timeout",
+            "connection reset",
+            "connection aborted",
+        )
+    )
 
 
 class GeminiService:
@@ -241,31 +283,17 @@ class GeminiService:
 
         The model output is treated as untrusted and is strictly parsed into the
         Pydantic schema before being surfaced.
+
+        The model call itself retries transient failures (capacity 503s and
+        transport errors) with exponential backoff; validation failures are
+        never retried.
         """
+        text = self._call_model_with_retry(prompt)
         try:
-            client = self._client()
-            response = client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config={
-                    "temperature": 0.2,
-                    "max_output_tokens": settings.gemini_max_output_tokens,
-                    "response_mime_type": "application/json",
-                },
-            )
-            text = (getattr(response, "text", None) or "").strip()
-            if not text:
-                raise GeminiGenerationError("The AI model returned an empty response.")
             parsed = json.loads(text)
         except (json.JSONDecodeError, TypeError) as exc:
             raise GeminiGenerationError(
                 "The AI model returned an invalid structured response."
-            ) from exc
-        except GeminiGenerationError:
-            raise
-        except Exception as exc:
-            raise GeminiGenerationError(
-                "The AI model could not complete that request."
             ) from exc
 
         try:
@@ -275,6 +303,48 @@ class GeminiService:
                 "The AI model returned a schema that does not match the expected fields."
             ) from exc
         return typed
+
+    def _call_model_with_retry(self, prompt: str) -> str:
+        """Call the model once, retrying transient failures with backoff.
+
+        Returns the stripped response text. Raises GeminiGenerationError when
+        the call fails for a non-transient reason or the retries are exhausted.
+        """
+        last_exc: BaseException | None = None
+        for attempt in range(_MAX_MODEL_ATTEMPTS):
+            try:
+                client = self._client()
+                response = client.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                    config={
+                        "temperature": 0.2,
+                        "max_output_tokens": settings.gemini_max_output_tokens,
+                        "response_mime_type": "application/json",
+                    },
+                )
+                text = (getattr(response, "text", None) or "").strip()
+                if not text:
+                    raise GeminiGenerationError(
+                        "The AI model returned an empty response."
+                    )
+                return text
+            except GeminiGenerationError:
+                # Empty response: a real model answer problem, not a transport
+                # problem. Do not retry; surface it immediately.
+                raise
+            except Exception as exc:  # noqa: BLE001 - raw SDK surface is broad
+                if _is_retryable_model_error(exc) and attempt < _MAX_MODEL_ATTEMPTS - 1:
+                    last_exc = exc
+                    time.sleep(_RETRY_BASE_SECONDS * (2**attempt))
+                    continue
+                raise GeminiGenerationError(
+                    "The AI model could not complete that request."
+                ) from exc
+        # Unreachable in practice: the loop either returns or raises.
+        raise GeminiGenerationError(
+            "The AI model could not complete that request."
+        ) from last_exc
 
     def _build_generation_prompt(
         self, *, content_type: str, topic: str, business_context: dict[str, Any],
