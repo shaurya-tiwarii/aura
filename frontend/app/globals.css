@@ -257,11 +257,11 @@ tbody tr:hover{background:#0E110E}
 .versus{color:var(--faint);font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
 .assistant-shell{display:flex;flex-direction:column;min-height:620px}
 .assistant-head p{color:var(--muted);font-size:12px}
-.messages{display:grid;gap:12px;flex:1;overflow:auto;padding:20px 0}
-.bubble{max-width:78%;padding:12px 14px;border-radius:16px;font-size:12.5px;line-height:1.6;white-space:pre-wrap}
-.bubble.user{margin-left:auto;background:var(--accent);color:var(--accent-ink)}
-.bubble.assistant{background:var(--panel-2);border:1px solid var(--line);color:var(--ink)}
-.chat-form{display:grid;grid-template-columns:1fr auto;gap:10px;border-top:1px solid var(--line);padding-top:14px}
+.messages{display:grid;gap:12px;flex:1;overflow:auto;padding:20px 0;align-content:start}
+.bubble{max-width:78%;padding:12px 14px;border-radius:16px;font-size:12.5px;line-height:1.6;white-space:pre-wrap;align-self:start}
+.bubble.user{justify-self:end;background:var(--accent);color:var(--accent-ink)}
+.bubble.assistant{justify-self:start;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);text-align:justify}
+.chat-form{display:grid;grid-template-columns:1fr auto;gap:10px;border-top:1px solid var(--line);padding-top:14px;align-items:end}
 .chat-form textarea{min-height:70px}
 .improvement-grid{display:grid;gap:12px}
 .improvement-card{border:1px solid var(--line);padding:15px;border-radius:14px;background:var(--panel)}
